@@ -1,0 +1,56 @@
+name: CI - PyTest & Selenium
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest-html pytest-metadata
+
+    - name: Install Chrome & Chromedriver
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget unzip xvfb libxi6 libgconf-2-4 google-chrome-stable || true
+        CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d "." -f1)
+        DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+        wget -q "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
+        unzip chromedriver_linux64.zip
+        sudo mv chromedriver /usr/local/bin/
+
+    - name: Run tests with PyTest
+      run: |
+        python -m pytest -v --html=report.html --self-contained-html
+
+    # Upload artifact (downloadable from GitHub Actions)
+    - name: Upload HTML Report as Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: pytest-report
+        path: report.html
+
+    # Deploy to GitHub Pages
+    - name: Deploy report to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./
+        publish_branch: gh-pages
+        keep_files: true
